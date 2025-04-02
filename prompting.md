@@ -13,7 +13,7 @@ task (one)
   tag (0 or many)
   origin (one)
 ```
-
+ 
 And the table config will be:
 ```
 task
