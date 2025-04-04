@@ -9,6 +9,8 @@ import tempfile
 import subprocess
 import time
 
+db_path = "C:\\Users\\Flotron_V\\OneDrive - proALPHA Group\\repo_local\\AppLauncher\\tasks.db"
+
 # Custom DateEntry class to handle empty values and time
 class CustomDateEntry(ttk.Frame):
     def __init__(self, master=None, **kw):
@@ -75,7 +77,7 @@ class CustomTreeview(ttk.Treeview):
 
 # Database setup
 def init_db():
-    conn = sqlite3.connect("tasks.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     cursor.executescript('''
@@ -201,7 +203,7 @@ class TaskManagerApp:
         self.load_theme()
 
     def load_theme(self):
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM settings WHERE key = 'theme'")
         result = cursor.fetchone()
@@ -448,7 +450,7 @@ class TaskManagerApp:
             style.configure("Treeview", background="#ffcc99", foreground="#003366", fieldbackground="#ffcc99")
 
         # Save the selected theme to the database
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", (theme,))
         conn.commit()
@@ -458,7 +460,7 @@ class TaskManagerApp:
     def update_field_dropdown(self, event):
         table = self.table_var.get()
         if table:
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table})")
             fields = cursor.fetchall()
@@ -470,16 +472,37 @@ class TaskManagerApp:
 
 
     def load_tasks(self):
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task")
-        tasks = cursor.fetchall()
-        conn.close()
+
+        # Load parent tasks
+        cursor.execute("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id IS NULL")
+        parent_tasks = cursor.fetchall()
+
         self.tree.delete(*self.tree.get_children())
 
-        for task in tasks:
-            indicator = "  └──" if task[6] is not None else "─────"
-            self.tree.insert("", "end", iid=task[0], values=(indicator, task[1], task[2], task[3], task[4], task[5]), tags=("constant_width",))
+        # Insert parent tasks into the tree
+        for task in parent_tasks:
+            self.tree.insert("", "end", iid=task[0], values=("─────", task[1], task[2], task[3], task[4], task[5]), tags=("constant_width",))
+            self.load_children_tasks(task[0], "")
+
+        conn.close()
+
+    def load_children_tasks(self, parent_id, parent_iid):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Load children tasks for the given parent_id
+        cursor.execute("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id = ?", (parent_id,))
+        children_tasks = cursor.fetchall()
+
+        for task in children_tasks:
+            indicator = "  └──"
+            task_iid = self.tree.insert(parent_iid, "end", iid=task[0], values=(indicator, task[1], task[2], task[3], task[4], task[5]), tags=("constant_width",))
+            self.load_children_tasks(task[0], task_iid)
+
+        conn.close()
+
 
     def on_task_select(self, event):
         selected_items = self.tree.selection()
@@ -529,7 +552,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a task to edit")
             return
         task_id = selected_item[0]
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
         task = cursor.fetchone()
@@ -543,7 +566,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a task to delete")
             return
         task_id = selected_item[0]
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM task WHERE id = ?", (task_id,))
         conn.commit()
@@ -605,7 +628,7 @@ class TaskManagerApp:
             desc = self.desc_var.get()
             started = started_entry.get_date()
             finished = finished_entry.get_date()
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             if task:
                 cursor.execute("UPDATE task SET customer=?, name=?, description=?, started_at=?, finished_at=? WHERE id=?", (customer, name, desc, started, finished, task[0]))
@@ -625,7 +648,7 @@ class TaskManagerApp:
 
     def update_customer_combobox(self, event=None):
         customer_input = self.customer_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT customer FROM task WHERE customer LIKE ?", ('%' + customer_input + '%',))
         customers = cursor.fetchall()
@@ -636,7 +659,7 @@ class TaskManagerApp:
 
     def update_name_combobox(self, event=None):
         name_input = self.name_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT name FROM task WHERE name LIKE ?", ('%' + name_input + '%',))
         names = cursor.fetchall()
@@ -647,7 +670,7 @@ class TaskManagerApp:
 
     def update_desc_combobox(self, event=None):
         desc_input = self.desc_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT description FROM task WHERE description LIKE ?", ('%' + desc_input + '%',))
         descriptions = cursor.fetchall()
@@ -665,7 +688,7 @@ class TaskManagerApp:
         self.tree.heading(col, command=lambda: self.sort_treeview(col, not descending))
 
     def load_related_data(self, task_ids):
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         deliveries = set()
@@ -785,7 +808,7 @@ class TaskManagerApp:
             server = self.server_var.get()
             environment = self.environment_var.get()
             delivery_date_time = delivery_entry.get_date()
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO delivery (version, server, environment, delivery_date_time) VALUES (?, ?, ?, ?)", (version, server, environment, delivery_date_time))
             delivery_id = cursor.lastrowid
@@ -804,7 +827,7 @@ class TaskManagerApp:
 
     def update_version_combobox(self, event=None):
         version_input = self.version_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT version FROM delivery WHERE version LIKE ?", ('%' + version_input + '%',))
         versions = cursor.fetchall()
@@ -813,7 +836,7 @@ class TaskManagerApp:
 
     def update_server_combobox(self, event=None):
         server_input = self.server_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT server FROM delivery WHERE server LIKE ?", ('%' + server_input + '%',))
         servers = cursor.fetchall()
@@ -822,7 +845,7 @@ class TaskManagerApp:
 
     def update_environment_combobox(self, event=None):
         environment_input = self.environment_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT environment FROM delivery WHERE environment LIKE ?", ('%' + environment_input + '%',))
         environments = cursor.fetchall()
@@ -835,7 +858,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a delivery to edit")
             return
         delivery_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM delivery WHERE id = ?", (delivery_id,))
         delivery = cursor.fetchone()
@@ -874,7 +897,7 @@ class TaskManagerApp:
                 server = self.server_var.get()
                 environment = self.environment_var.get()
                 delivery_date_time = delivery_entry.get_date()
-                conn = sqlite3.connect("tasks.db")
+                conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE delivery SET version=?, server=?, environment=?, delivery_date_time=? WHERE id=?", (version, server, environment, delivery_date_time, delivery_id))
                 conn.commit()
@@ -894,7 +917,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a delivery to delete")
             return
         delivery_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM delivery WHERE id = ?", (delivery_id,))
         conn.commit()
@@ -922,7 +945,7 @@ class TaskManagerApp:
         def save_link():
             link_type = self.link_type_var.get()
             raw_link = link_entry.get()
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO link (type, raw_link) VALUES (?, ?)", (link_type, raw_link))
             link_id = cursor.lastrowid
@@ -939,7 +962,7 @@ class TaskManagerApp:
 
     def update_link_type_combobox(self, event=None):
         link_type_input = self.link_type_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT type FROM link WHERE type LIKE ?", ('%' + link_type_input + '%',))
         link_types = cursor.fetchall()
@@ -952,7 +975,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a link to edit")
             return
         link_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM link WHERE id = ?", (link_id,))
         link = cursor.fetchone()
@@ -974,7 +997,7 @@ class TaskManagerApp:
             def save_link():
                 link_type = self.link_type_var.get()
                 raw_link = link_entry.get()
-                conn = sqlite3.connect("tasks.db")
+                conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE link SET type=?, raw_link=? WHERE id=?", (link_type, raw_link, link_id))
                 conn.commit()
@@ -993,7 +1016,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a link to delete")
             return
         link_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM link WHERE id = ?", (link_id,))
         conn.commit()
@@ -1023,7 +1046,7 @@ class TaskManagerApp:
         def save_tag():
             tag_type = self.tag_type_var.get()
             keywords = self.keywords_var.get()
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO tag (type, keywords) VALUES (?, ?)", (tag_type, keywords))
             tag_id = cursor.lastrowid
@@ -1041,7 +1064,7 @@ class TaskManagerApp:
 
     def update_tag_type_combobox(self, event=None):
         tag_type_input = self.tag_type_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT type FROM tag WHERE type LIKE ?", ('%' + tag_type_input + '%',))
         tag_types = cursor.fetchall()
@@ -1050,7 +1073,7 @@ class TaskManagerApp:
 
     def update_keywords_combobox(self, event=None):
         keywords_input = self.keywords_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT keywords FROM tag WHERE keywords LIKE ?", ('%' + keywords_input + '%',))
         keywords = cursor.fetchall()
@@ -1063,7 +1086,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a tag to edit")
             return
         tag_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM tag WHERE id = ?", (tag_id,))
         tag = cursor.fetchone()
@@ -1086,7 +1109,7 @@ class TaskManagerApp:
             def save_tag():
                 tag_type = self.tag_type_var.get()
                 keywords = self.keywords_var.get()
-                conn = sqlite3.connect("tasks.db")
+                conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE tag SET type=?, keywords=? WHERE id=?", (tag_type, keywords, tag_id))
                 conn.commit()
@@ -1105,7 +1128,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a tag to delete")
             return
         tag_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM tag WHERE id = ?", (tag_id,))
         conn.commit()
@@ -1140,7 +1163,7 @@ class TaskManagerApp:
             origin_name = self.origin_name_var.get()
             origin_type = self.origin_type_var.get()
             raw_link = link_entry.get()
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO origin (name, type, raw_link) VALUES (?, ?, ?)", (origin_name, origin_type, raw_link))
             origin_id = cursor.lastrowid
@@ -1158,7 +1181,7 @@ class TaskManagerApp:
 
     def update_origin_name_combobox(self, event=None):
         origin_name_input = self.origin_name_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT name FROM origin WHERE name LIKE ?", ('%' + origin_name_input + '%',))
         origin_names = cursor.fetchall()
@@ -1167,7 +1190,7 @@ class TaskManagerApp:
 
     def update_origin_type_combobox(self, event=None):
         origin_type_input = self.origin_type_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT type FROM origin WHERE type LIKE ?", ('%' + origin_type_input + '%',))
         origin_types = cursor.fetchall()
@@ -1180,7 +1203,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select an origin to edit")
             return
         origin_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM origin WHERE id = ?", (origin_id,))
         origin = cursor.fetchone()
@@ -1209,7 +1232,7 @@ class TaskManagerApp:
                 origin_name = self.origin_name_var.get()
                 origin_type = self.origin_type_var.get()
                 raw_link = link_entry.get()
-                conn = sqlite3.connect("tasks.db")
+                conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE origin SET name=?, type=?, raw_link=? WHERE id=?", (origin_name, origin_type, raw_link, origin_id))
                 conn.commit()
@@ -1228,7 +1251,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select an origin to delete")
             return
         origin_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM origin WHERE id = ?", (origin_id,))
         conn.commit()
@@ -1239,7 +1262,7 @@ class TaskManagerApp:
         selected_item = self.link_tree.selection()
         if selected_item:
             link_id = selected_item[0]
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT raw_link FROM link WHERE id = ?", (link_id,))
             link = cursor.fetchone()
@@ -1251,7 +1274,7 @@ class TaskManagerApp:
         selected_item = self.origin_tree.selection()
         if selected_item:
             origin_id = selected_item[0]
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT raw_link FROM origin WHERE id = ?", (origin_id,))
             origin = cursor.fetchone()
@@ -1283,7 +1306,7 @@ class TaskManagerApp:
         duration_entry = tk.Entry(form)
         duration_entry.grid(row=3, column=1)
 
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT id, name FROM origin")
         origins = cursor.fetchall()
@@ -1315,7 +1338,7 @@ class TaskManagerApp:
                 messagebox.showwarning("Warning", "Selected origin does not exist")
                 return
 
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO booking (description, started_at, ended_at, duration, task_id, origin_id) VALUES (?, ?, ?, ?, ?, ?)", (description, started_at, ended_at, duration, task_id, origin_id))
             conn.commit()
@@ -1330,7 +1353,7 @@ class TaskManagerApp:
 
     def update_booking_desc_combobox(self, event=None):
         booking_desc_input = self.booking_desc_var.get()
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT description FROM booking WHERE description LIKE ?", ('%' + booking_desc_input + '%',))
         booking_descs = cursor.fetchall()
@@ -1343,7 +1366,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a booking to edit")
             return
         booking_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM booking WHERE id = ?", (booking_id,))
         booking = cursor.fetchone()
@@ -1378,7 +1401,7 @@ class TaskManagerApp:
             duration_entry.grid(row=3, column=1)
             duration_entry.insert(0, booking[4])
 
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT id, name FROM origin")
             origins = cursor.fetchall()
@@ -1407,7 +1430,7 @@ class TaskManagerApp:
                     messagebox.showwarning("Warning", "Selected origin does not exist")
                     return
 
-                conn = sqlite3.connect("tasks.db")
+                conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE booking SET description=?, started_at=?, ended_at=?, duration=?, origin_id=? WHERE id=?", (description, started_at, ended_at, duration, origin_id, booking_id))
                 conn.commit()
@@ -1425,7 +1448,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a booking to delete")
             return
         booking_id = self.selected_related_id
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM booking WHERE id = ?", (booking_id,))
         conn.commit()
@@ -1457,7 +1480,7 @@ class TaskManagerApp:
         note = None
 
         if notes_id:
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM note WHERE note.id = ?", (notes_id,))
             note = cursor.fetchone()
@@ -1484,7 +1507,7 @@ class TaskManagerApp:
             with open(self.temp_file_path, "r") as file:
                 content = file.read()
 
-            conn = sqlite3.connect("tasks.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             if behavior == 'edit':
                 cursor.execute("SELECT id, content FROM note WHERE note.id = ?", (notes_id,))
@@ -1508,7 +1531,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a task to delete a note")
             return
         task_id = selected_items[0]
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM note WHERE task_id = ?", (task_id,))
         conn.commit()
@@ -1536,7 +1559,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please enter all search criteria")
             return
 
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         if operator == "LIKE":
@@ -1571,7 +1594,7 @@ class TaskManagerApp:
         item_values = result_tree.item(selected_item, "values")
         related_id = item_values[0]  # Assuming the first column is the ID of the searched table
 
-        conn = sqlite3.connect("tasks.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         if table == "task":
