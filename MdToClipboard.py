@@ -75,11 +75,7 @@ class MdToClipboard:
         html_body = f"<html><body>{markdown.markdown(markdown_text)}</body></html>"
 
         html_text = MdToClipboard.create_html_with_fragment(html_body)
-        print("*************")
-        print(html_text)
         plain_text = html2text.html2text(html_body)
-        print("*************")
-        print(plain_text)
         rtf_text = MdToClipboard.html_to_rtf(html_body)
 
         return MdToClipboard.copy_to_clipboard(rtf_text, plain_text, html_text)
@@ -89,11 +85,7 @@ class MdToClipboard:
         html_body = f"<html><body>{html_body}</body></html>"
 
         html_text = MdToClipboard.create_html_with_fragment(html_body)
-        print("*************")
-        print(html_text)
         plain_text = html2text.html2text(html_body)
-        print("*************")
-        print(plain_text)
         rtf_text = MdToClipboard.html_to_rtf(html_body)
 
         return MdToClipboard.copy_to_clipboard(rtf_text, plain_text, html_text)

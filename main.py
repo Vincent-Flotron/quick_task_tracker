@@ -10,7 +10,12 @@ import subprocess
 import time
 from MdToClipboard import MdToClipboard
 
-db_path = "C:\\Users\\Flotron_V\\OneDrive - proALPHA Group\\repo_local\\AppLauncher\\tasks.db"
+
+config_file_path = "./config.conf"
+
+with open(config_file_path, "r") as f:
+    db_path = f.readline().strip()
+
 
 # Custom DateEntry class to handle empty values and time
 class CustomDateEntry(ttk.Frame):
@@ -581,7 +586,7 @@ class TaskManagerApp:
 
         # report_text = "\n".join(report_lines)
         report_text = "\n".join(report_lines)
-        
+
         MdToClipboard.html_to_clipboard_for_onenote(report_text)
         messagebox.showinfo("Info", "Report copied to clipboard")
 

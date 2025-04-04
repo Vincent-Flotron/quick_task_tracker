@@ -3,3 +3,5 @@ tasks_test.db
 tasks_old.db
 MdToClipboard.py
 __pycache__/
+config.conf
+html.html
