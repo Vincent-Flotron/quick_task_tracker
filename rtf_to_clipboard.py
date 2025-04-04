@@ -11,10 +11,10 @@ def copy_to_clipboard(rtf_content, plain_text_content, html_content):
         rtf_format = win32clipboard.RegisterClipboardFormat("Rich Text Format")
 
         # Set the RTF content to the clipboard
-        # win32clipboard.SetClipboardData(rtf_format, rtf_content.encode('utf-8'))
+        win32clipboard.SetClipboardData(rtf_format, rtf_content.encode('utf-8'))
 
         # Set the plain text content to the clipboard
-        # win32clipboard.SetClipboardData(win32clipboard.CF_TEXT, plain_text_content.encode('utf-8'))
+        win32clipboard.SetClipboardData(win32clipboard.CF_TEXT, plain_text_content.encode('utf-8'))
 
         # Register the HTML format
         html_format = win32clipboard.RegisterClipboardFormat("HTML Format")
@@ -67,6 +67,15 @@ def display_clipboard_info(info):
             print(f"Error: {content['error']}")
         print("-" * 40)
 
+def create_html_with_fragment(html_body):
+    html_header = "Version:1.0\nStartHTML:{0:010d}\nEndHTML:{1:010d}\nStartFragment:{2:010d}\nEndFragment:{3:010d}\n"
+    start_html = len(html_header.format(0, 0, 0, 0))
+    end_html = start_html + len(html_body)
+    start_fragment = start_html
+    end_fragment = end_html
+    html_content = html_header.format(start_html, end_html, start_fragment, end_fragment) + html_body
+    return html_content
+
 # RTF content to copy
 rtf_text = r"""{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}}
 {\*\generator Riched20 10.0.18362;}viewkind4\uc1
@@ -79,16 +88,13 @@ rtf_text = r"""{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fchars
 plain_text = "Title of the Document\nThis is some italicized text.\nHere is a word that is bold."
 
 # HTML content to copy
-html_text = """Version:1.0
-StartHTML:0000000105
-EndHTML:0000000313
-StartFragment:0000000124
-EndFragment:0000000276
-<html><body>
+html_body = """<html><body>
 <p><strong>Title of the Document</strong></p>
 <p><em>This is some italicized text.</em></p>
 <p>Here is a word that is <strong>bold</strong>.</p>
 </body></html>"""
+
+html_text = create_html_with_fragment(html_body)
 
 # Copy the RTF, plain text, and HTML content to the clipboard
 copy_to_clipboard(rtf_text, plain_text, html_text)
