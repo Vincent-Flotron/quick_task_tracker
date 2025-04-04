@@ -224,16 +224,12 @@ class Database:
     def get_theme(self):
         result = self.fetch_one("SELECT value FROM settings WHERE key = 'theme'")
         return result[0] if result else None
-    
+
     def connect(self):
         self.conn = sqlite3.connect(self.db_path)
 
     def disconnect(self):
         self.conn.close()
-    
-    def fetch_one_connected(self, query, params=None):
-        cursor = self.execute_query(query, params)
-        return cursor.fetchone()
 
     class Connexion:
         def __init__(self, db_path):
@@ -255,10 +251,10 @@ class Database:
 
         def status(self):
             return "connected" if self._is_connected else "disconnected"
-        
+
         def is_connected(self):
             return self._is_connected
-        
+
         def fetch_all(self, query, params=None):
             cursor = self._execute_query(query, params)
             return cursor.fetchall()
@@ -266,7 +262,7 @@ class Database:
         def fetch_one(self, query, params=None):
             cursor = self._execute_query(query, params)
             return cursor.fetchone()
-        
+
         def _execute_query(self, query, params=None):
             cursor = self.conn.cursor()
             if params:
@@ -322,6 +318,38 @@ class TaskManagerApp:
         Treeview_height = 3
         row_offset = 0
         col_offset = 0
+
+        # Add search functionality
+        tk.Label(self.root, text="Search").grid(column=0, row=row_offset)
+        row_offset += 1
+        search_frame = tk.Frame(self.root)
+        search_frame.grid(column=0, row=row_offset)
+        row_offset += 1
+        tk.Label(search_frame, text="Table:").grid(column=0, row=0)
+        self.table_var = tk.StringVar()
+        table_dropdown = ttk.Combobox(search_frame, textvariable=self.table_var)
+        table_dropdown['values'] = ["task", "delivery", "link", "tag", "origin", "booking", "note"]
+        table_dropdown.grid(column=1, row=0)
+        table_dropdown.bind("<<ComboboxSelected>>", self.update_field_dropdown)
+        tk.Label(search_frame, text="Field:").grid(column=2, row=0)
+        self.field_var = tk.StringVar()
+        self.field_dropdown = ttk.Combobox(search_frame, textvariable=self.field_var)
+        self.field_dropdown.grid(column=3, row=0)
+        tk.Label(search_frame, text="Operator:").grid(column=4, row=0)
+        self.operator_var = tk.StringVar()
+        operator_dropdown = ttk.Combobox(search_frame, textvariable=self.operator_var)
+        operator_dropdown['values'] = ["LIKE", "=", "!=", "<", ">", "<=", ">="]
+        operator_dropdown.grid(column=5, row=0)
+        operator_dropdown.current(0)  # Set default operator to LIKE
+        tk.Label(search_frame, text="Value:").grid(column=6, row=0)
+        self.value_entry = tk.Entry(search_frame)
+        self.value_entry.grid(column=7, row=0)
+        tk.Button(search_frame, text="Search", command=self.search_data).grid(column=8, row=0)
+
+        row_offset += 1
+        col_offset = 0
+
+        # Tasks
         self.tree = ttk.Treeview(self.root, columns=("indicator", "customer", "name", "description", "started_at", "finished_at"), show="headings", height=Treeview_height)
         self.tree.heading("indicator", text=" ")
         self.tree.column("indicator", width=45)
@@ -477,33 +505,6 @@ class TaskManagerApp:
         tk.Button(note_btn_frame, text="Delete Note", command=self.delete_note).grid(column=col_offset, row=0)
         col_offset += 1
 
-        # Add search functionality
-        tk.Label(self.root, text="Search").grid(column=0, row=row_offset)
-        row_offset += 1
-        search_frame = tk.Frame(self.root)
-        search_frame.grid(column=0, row=row_offset)
-        row_offset += 1
-        tk.Label(search_frame, text="Table:").grid(column=0, row=0)
-        self.table_var = tk.StringVar()
-        table_dropdown = ttk.Combobox(search_frame, textvariable=self.table_var)
-        table_dropdown['values'] = ["task", "delivery", "link", "tag", "origin", "booking", "note"]
-        table_dropdown.grid(column=1, row=0)
-        table_dropdown.bind("<<ComboboxSelected>>", self.update_field_dropdown)
-        tk.Label(search_frame, text="Field:").grid(column=2, row=0)
-        self.field_var = tk.StringVar()
-        self.field_dropdown = ttk.Combobox(search_frame, textvariable=self.field_var)
-        self.field_dropdown.grid(column=3, row=0)
-        tk.Label(search_frame, text="Operator:").grid(column=4, row=0)
-        self.operator_var = tk.StringVar()
-        operator_dropdown = ttk.Combobox(search_frame, textvariable=self.operator_var)
-        operator_dropdown['values'] = ["LIKE", "=", "!=", "<", ">", "<=", ">="]
-        operator_dropdown.grid(column=5, row=0)
-        operator_dropdown.current(0)  # Set default operator to LIKE
-        tk.Label(search_frame, text="Value:").grid(column=6, row=0)
-        self.value_entry = tk.Entry(search_frame)
-        self.value_entry.grid(column=7, row=0)
-        tk.Button(search_frame, text="Search", command=self.search_data).grid(column=8, row=0)
-
     def change_theme(self, theme):
         if theme == "normal":
             self.root.config(bg="white")
@@ -565,20 +566,20 @@ class TaskManagerApp:
         def move_matching_row_to_end(array, col_nb = 2, pattern = "PROD"):
             # Find rows where the second column is "PROD"
             prod_rows = [row for row in array if row[col_nb] == pattern]
-            
+
             # Remove these rows from the original array
             filtered_array = [row for row in array if row[col_nb] != pattern]
-            
+
             # Append the "PROD" rows to the end
             result = filtered_array + prod_rows
-            
+
             return result
-        
+
 
         def sort_array_by_cols(list_of_lists, col_nbs, direction="asc"):
             """
             Sorts a list of lists by one or more column indices.
-            
+
             :param list_of_lists: List of rows (each a list).
             :param col_nbs: A single column index (int) or list of column indices to sort by.
             :param direction: 'asc' for ascending, 'desc' for descending.
@@ -646,7 +647,7 @@ class TaskManagerApp:
                 if origins:
                     for origin in origins:
                         report_lines.append(f"{indent}{sub_indent}<li><a href=\"{origin[2]}\">BCS: {origin[0]}</a></li>")
-                    
+
             self.db.connexion.disconnect()
 
             # Recursively add child tasks
@@ -932,7 +933,7 @@ class TaskManagerApp:
             FROM booking b
             WHERE b.task_id = ?""", (task_id,))
             bookings.update(booking_rel)
- 
+
             note_rel = self.db.fetch_all("""
             SELECT n.id, n.content
             FROM note n
@@ -1688,7 +1689,8 @@ class TaskManagerApp:
         else:
             query = f"SELECT * FROM {table} WHERE {field} {operator} ?"
 
-        results = self.db.fetch_all(query, (value,))
+        cursor = self.db.execute_query(query, (value,))
+        results = cursor.fetchall()
 
         if results:
             search_result_window = tk.Toplevel(self.root)
