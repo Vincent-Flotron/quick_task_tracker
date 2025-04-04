@@ -8,6 +8,7 @@ import os
 import tempfile
 import subprocess
 import time
+from MdToClipboard import MdToClipboard
 
 db_path = "C:\\Users\\Flotron_V\\OneDrive - proALPHA Group\\repo_local\\AppLauncher\\tasks.db"
 
@@ -489,11 +490,26 @@ class TaskManagerApp:
             
             return result
         
-        def sort_array_by_col_nb(list_of_lists, col_nb, direction="asc"):
-            reverse = False if direction.lower() == "asc" else True
-            # Sort the list in descending order by the second column
-            sorted_list = sorted(list_of_lists, key=lambda x: x[col_nb], reverse=True)
-            return sorted_list
+
+        def sort_array_by_cols(list_of_lists, col_nbs, direction="asc"):
+            """
+            Sorts a list of lists by one or more column indices.
+            
+            :param list_of_lists: List of rows (each a list).
+            :param col_nbs: A single column index (int) or list of column indices to sort by.
+            :param direction: 'asc' for ascending, 'desc' for descending.
+            :return: Sorted list of lists.
+            """
+            if isinstance(col_nbs, int):
+                col_nbs = [col_nbs]
+
+            reverse = direction.lower() == "desc"
+
+            return sorted(
+                list_of_lists,
+                key=lambda x: tuple(x[col] for col in col_nbs),
+                reverse=reverse
+            )
 
 
         def add_task_to_report(task_id, indent_level=0):
@@ -508,32 +524,44 @@ class TaskManagerApp:
             cursor.execute("SELECT id, customer, name, description, started_at, finished_at FROM task WHERE id = ?", (task_id,))
             task = cursor.fetchone()
             if task:
+                one = 1
                 indent = "    " * indent_level
-                report_lines.append(f"{indent}{task[1]}:")
-                report_lines.append(f"{indent}  {task[2]}: {task[3]}")
-                report_lines.append("")
+                sub_indent = "    " * one
+                if task[1] != "":
+                    report_lines.append(f"*{indent}**{task[1]}**: `{task[2]}`")
+                    report_lines.append(f"{indent}{sub_indent}- Description: {task[3]}")
+                else:
+                    report_lines.append(f"{indent}- `{task[2]}`")
+                    report_lines.append(f"{indent}{sub_indent}- Description: {task[3]}")
 
                 # Get related deliveries
                 cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
                 deliveries = cursor.fetchall()
                 if deliveries:
-                    report_lines.append(f"{indent}Deliveries:")
+                    report_lines.append(f"{indent}{sub_indent}- Deliveries:")
 
                     # Order deliveries
-                    deliveries = sort_array_by_col_nb(deliveries, 2)
+                    deliveries = sort_array_by_cols(deliveries, [0, 2])
                     deliveries = move_matching_row_to_end(deliveries, 2, "PROD")
 
+                    last_version_and_server = None
+                    delivery_date = ""
                     for delivery in deliveries:
-                        report_lines.append(f"{indent}  V {delivery[0]}, {delivery[1]}, {delivery[2]}, {delivery[3]}")
+                        version_and_server = f"V {delivery[0]}, {delivery[1]}"
+                        if version_and_server != last_version_and_server :
+                            report_lines.append(f"{indent}{sub_indent}{sub_indent}- {version_and_server}:") # new version or server
+                        delivery_date = delivery[3][:-3].replace("T", " ").replace("-", ".").replace(":", "h")
+                        report_lines.append(f"{indent}{sub_indent}{sub_indent}{sub_indent}- [x] '{delivery[2]}', {delivery_date}")
+                        last_version_and_server = version_and_server
+
                     report_lines.append("")
 
                 # Get related origins
                 cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
                 origins = cursor.fetchall()
                 if origins:
-                    report_lines.append(f"{indent}  Link for booking:")
                     for origin in origins:
-                        report_lines.append(f"{indent}    {origin[0]}: {origin[2]}")
+                        report_lines.append(f"{indent}{sub_indent}- [BCS: {origin[0]}]({origin[2]})")
                     report_lines.append("")
 
             conn.close()
@@ -547,9 +575,13 @@ class TaskManagerApp:
         for task_id in selected_items:
             add_task_to_report(task_id)
 
-        report_text = "\n".join(report_lines)
-        self.root.clipboard_clear()
-        self.root.clipboard_append(report_text)
+        # report_text = "\n".join(report_lines)
+        report_text = "\r\n".join(report_lines)
+        print("ççççççççççççç")
+        print(report_text)
+        # self.root.clipboard_clear()
+        # self.root.clipboard_append(report_text)
+        MdToClipboard.md_to_clipboard_for_onenote(report_text)
         messagebox.showinfo("Info", "Report copied to clipboard")
 
     def get_task_hierarchy(self, task_ids):
