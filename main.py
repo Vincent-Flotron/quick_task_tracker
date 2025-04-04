@@ -528,17 +528,18 @@ class TaskManagerApp:
                 indent = "    " * indent_level
                 sub_indent = "    " * one
                 if task[1] != "":
-                    report_lines.append(f"*{indent}**{task[1]}**: `{task[2]}`")
-                    report_lines.append(f"{indent}{sub_indent}- Description: {task[3]}")
+                    report_lines.append(f"{indent}<p><strong>{task[1]}</strong>: <code>{task[2]}</code><p><ul>")
+                    # report_lines.append(f"{indent}<p>{task[1]}</p><ul>")
+                    report_lines.append(f"{indent}{sub_indent}<li>Description: {task[3]}</li>")
                 else:
-                    report_lines.append(f"{indent}- `{task[2]}`")
-                    report_lines.append(f"{indent}{sub_indent}- Description: {task[3]}")
+                    report_lines.append(f"{indent}<li>Sub-task: <code>{task[2]}</code></li><ul>")
+                    report_lines.append(f"{indent}{sub_indent}<li>Description: {task[3]}</li>")
 
                 # Get related deliveries
                 cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
                 deliveries = cursor.fetchall()
                 if deliveries:
-                    report_lines.append(f"{indent}{sub_indent}- Deliveries:")
+                    report_lines.append(f"{indent}{sub_indent}<li>Deliveries:</li><ul>")
 
                     # Order deliveries
                     deliveries = sort_array_by_cols(deliveries, [0, 2])
@@ -546,24 +547,26 @@ class TaskManagerApp:
 
                     last_version_and_server = None
                     delivery_date = ""
+                    close_list_tag = ""
                     for delivery in deliveries:
                         version_and_server = f"V {delivery[0]}, {delivery[1]}"
                         if version_and_server != last_version_and_server :
-                            report_lines.append(f"{indent}{sub_indent}{sub_indent}- {version_and_server}:") # new version or server
+                            report_lines.append(f"{close_list_tag}{indent}{sub_indent}{sub_indent}<li>{version_and_server}:</li><ul>") # new version or server
+                            close_list_tag = "</ul>"
                         delivery_date = delivery[3][:-3].replace("T", " ").replace("-", ".").replace(":", "h")
-                        report_lines.append(f"{indent}{sub_indent}{sub_indent}{sub_indent}- [x] '{delivery[2]}', {delivery_date}")
+                        report_lines.append(f"{indent}{sub_indent}{sub_indent}{sub_indent}<li>[x] '{delivery[2]}', {delivery_date}")
                         last_version_and_server = version_and_server
 
-                    report_lines.append("")
+                    report_lines.append("</ul></ul>")
 
                 # Get related origins
                 cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
                 origins = cursor.fetchall()
                 if origins:
                     for origin in origins:
-                        report_lines.append(f"{indent}{sub_indent}- [BCS: {origin[0]}]({origin[2]})")
-                    report_lines.append("")
-
+                        # report_lines.append(f"{indent}{sub_indent}<li>[BCS: {origin[0]}]({origin[2]})</li>")
+                        report_lines.append(f"{indent}{sub_indent}<li><a href=\"{origin[2]}\">BCS: {origin[0]}</a></li>")
+                    
             conn.close()
 
             # Recursively add child tasks
@@ -574,14 +577,12 @@ class TaskManagerApp:
         # Generate the report with hierarchy
         for task_id in selected_items:
             add_task_to_report(task_id)
+            report_lines.append("</ul>")
 
         # report_text = "\n".join(report_lines)
-        report_text = "\r\n".join(report_lines)
-        print("ççççççççççççç")
-        print(report_text)
-        # self.root.clipboard_clear()
-        # self.root.clipboard_append(report_text)
-        MdToClipboard.md_to_clipboard_for_onenote(report_text)
+        report_text = "\n".join(report_lines)
+        
+        MdToClipboard.html_to_clipboard_for_onenote(report_text)
         messagebox.showinfo("Info", "Report copied to clipboard")
 
     def get_task_hierarchy(self, task_ids):
@@ -595,7 +596,8 @@ class TaskManagerApp:
             children = cursor.fetchall()
             filtered_children = [child[0] for child in children if child[0] in task_ids]
             if len(filtered_children) > 0:
-                subtasks.append(*filtered_children)
+                for filtered_child in filtered_children:
+                    subtasks.append(filtered_child)
             if task_id in subtasks:
                 del task_hierarchy[task_id]
             else:
