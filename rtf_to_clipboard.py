@@ -1,4 +1,5 @@
 import win32clipboard
+import html2text
 
 def copy_to_clipboard(rtf_content, plain_text_content, html_content):
     # Open the clipboard
@@ -14,7 +15,7 @@ def copy_to_clipboard(rtf_content, plain_text_content, html_content):
         win32clipboard.SetClipboardData(rtf_format, rtf_content.encode('utf-8'))
 
         # Set the plain text content to the clipboard
-        win32clipboard.SetClipboardData(win32clipboard.CF_TEXT, plain_text_content.encode('utf-8'))
+        win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, plain_text_content)
 
         # Register the HTML format
         html_format = win32clipboard.RegisterClipboardFormat("HTML Format")
@@ -76,25 +77,57 @@ def create_html_with_fragment(html_body):
     html_content = html_header.format(start_html, end_html, start_fragment, end_fragment) + html_body
     return html_content
 
-# RTF content to copy
-rtf_text = r"""{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}}
-{\*\generator Riched20 10.0.18362;}viewkind4\uc1
-\pard\fs36\b Title of the Document\par
-\fs24\i This is some italicized text.\par
-\fs24 Here is a word that is \b bold\b0 .\par
-}"""
+def html_to_rtf(html_body):
+    from bs4 import BeautifulSoup
 
-# Plain text content to copy
-plain_text = "Title of the Document\nThis is some italicized text.\nHere is a word that is bold."
+    soup = BeautifulSoup(html_body, 'html.parser')
+    rtf_content = r"""{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}}
+{\*\generator Riched20 10.0.18362;}viewkind4\uc1
+"""
+
+    for tag in soup.descendants:
+        if tag.name == 'p':
+            rtf_content += r"\pard "
+            if tag.strong:
+                rtf_content += r"\b "
+            if tag.em:
+                rtf_content += r"\i "
+            rtf_content += tag.get_text().replace('\n', ' ') + r" \par "
+
+    rtf_content += r"}"
+    return rtf_content
 
 # HTML content to copy
-html_body = """<html><body>
-<p><strong>Title of the Document</strong></p>
-<p><em>This is some italicized text.</em></p>
-<p>Here is a word that is <strong>bold</strong>.</p>
-</body></html>"""
+html_body = """<html>
+<body>
+<ul>
+    <li>(Dev) Soply
+    <ul>
+        <li>TaskN°bla
+        <ul>
+            <li>booking: <a href="https://bla.ch">https://bla.ch</a></li>
+            <li>
+            <ul>delivered
+                <li>&#x2610; Testy</li>
+                <li>&#x2612; Testc</li>
+            </ul>
+            </li>
+        </ul>
+        </li>
+    </ul>
+    </li>
+</ul>
+</body>
+</html>
+"""
 
 html_text = create_html_with_fragment(html_body)
+
+# Generate plain text from HTML
+plain_text = html2text.html2text(html_body)
+
+# Generate RTF text from HTML
+rtf_text = html_to_rtf(html_body)
 
 # Copy the RTF, plain text, and HTML content to the clipboard
 copy_to_clipboard(rtf_text, plain_text, html_text)
