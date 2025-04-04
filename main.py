@@ -232,10 +232,10 @@ class TaskManagerApp:
         theme_menu.add_command(label="Gray and Red Theme", command=lambda: self.change_theme("gray_red"))
         theme_menu.add_command(label="Orange and Blue Theme", command=lambda: self.change_theme("orange_blue"))
 
-        Treeview_height = 4
+        Treeview_height = 3
         row_offset = 0
         col_offset = 0
-        self.tree = ttk.Treeview(self.root, columns=("indicator", "customer", "name", "description", "started_at", "finished_at"), show="headings")
+        self.tree = ttk.Treeview(self.root, columns=("indicator", "customer", "name", "description", "started_at", "finished_at"), show="headings", height=Treeview_height)
         self.tree.heading("indicator", text=" ")
         self.tree.column("indicator", width=45)
         for col in ("customer", "name", "description", "started_at", "finished_at"):
@@ -1453,7 +1453,7 @@ class TaskManagerApp:
         self.load_note_and_open_text_editor(notes_id)
 
     def load_note_and_open_text_editor(self, notes_id):
-        task_id = self.tree.selection()[0]
+        # task_id = self.tree.selection()[0]
         note = None
 
         if notes_id:
@@ -1463,7 +1463,8 @@ class TaskManagerApp:
             note = cursor.fetchone()
             conn.close()
 
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
+        # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".md")
         self.temp_file_path = temp_file.name
 
         if note:
@@ -1486,9 +1487,10 @@ class TaskManagerApp:
             conn = sqlite3.connect("tasks.db")
             cursor = conn.cursor()
             if behavior == 'edit':
-                cursor.execute("SELECT content FROM note WHERE note.id = ?", (notes_id))
+                cursor.execute("SELECT id, content FROM note WHERE note.id = ?", (notes_id,))
                 note = cursor.fetchone()
-                cursor.execute("UPDATE note SET content = ? WHERE id = ?", (content, notes_id))
+
+                cursor.execute("UPDATE note SET content = ? WHERE id = ?", (content, note[0]))
             else:
                 cursor.execute("INSERT INTO note (task_id, content) VALUES (?, ?)", (task_id, content))
             conn.commit()
