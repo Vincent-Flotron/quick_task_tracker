@@ -466,13 +466,22 @@ class TaskManagerApp:
 
     def generate_report(self):
         selected_items = self.tree.selection()
+        selected_items = [int(item) for item in selected_items]
         if not selected_items:
             messagebox.showwarning("Warning", "Please select a task to generate a report")
             return
 
-        report_lines = []
+        # Get the hierarchy of selected tasks
+        task_hierarchy = self.get_task_hierarchy(selected_items)
 
-        for task_id in selected_items:
+        report_lines = []
+        visited_tasks = set()
+
+        def add_task_to_report(task_id, indent_level=0):
+            if task_id in visited_tasks:
+                return
+            visited_tasks.add(task_id)
+
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
@@ -480,38 +489,69 @@ class TaskManagerApp:
             cursor.execute("SELECT id, customer, name, description, started_at, finished_at FROM task WHERE id = ?", (task_id,))
             task = cursor.fetchone()
             if task:
-                report_lines.append(f"Task ID: {task[0]}")
-                report_lines.append(f"Customer: {task[1]}")
-                report_lines.append(f"Name: {task[2]}")
-                report_lines.append(f"Description: {task[3]}")
-                report_lines.append(f"Started At: {task[4]}")
-                report_lines.append(f"Finished At: {task[5]}")
+                indent = "    " * indent_level
+                report_lines.append(f"{indent}Task ID: {task[0]}")
+                report_lines.append(f"{indent}Customer: {task[1]}")
+                report_lines.append(f"{indent}Name: {task[2]}")
+                report_lines.append(f"{indent}Description: {task[3]}")
+                report_lines.append(f"{indent}Started At: {task[4]}")
+                report_lines.append(f"{indent}Finished At: {task[5]}")
                 report_lines.append("")
 
                 # Get related deliveries
                 cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
                 deliveries = cursor.fetchall()
                 if deliveries:
-                    report_lines.append("Related Deliveries:")
+                    report_lines.append(f"{indent}Related Deliveries:")
                     for delivery in deliveries:
-                        report_lines.append(f"  Version: {delivery[0]}, Server: {delivery[1]}, Environment: {delivery[2]}, Delivery Date Time: {delivery[3]}")
+                        report_lines.append(f"{indent}  Version: {delivery[0]}, Server: {delivery[1]}, Environment: {delivery[2]}, Delivery Date Time: {delivery[3]}")
                     report_lines.append("")
 
                 # Get related origins
                 cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
                 origins = cursor.fetchall()
                 if origins:
-                    report_lines.append("Related Origins:")
+                    report_lines.append(f"{indent}Related Origins:")
                     for origin in origins:
-                        report_lines.append(f"  Name: {origin[0]}, Type: {origin[1]}, Raw Link: {origin[2]}")
+                        report_lines.append(f"{indent}  Name: {origin[0]}, Type: {origin[1]}, Raw Link: {origin[2]}")
                     report_lines.append("")
 
             conn.close()
+
+            # Recursively add child tasks
+            if task_id in task_hierarchy:
+                for child_id in task_hierarchy[task_id]:
+                    add_task_to_report(child_id, indent_level + 1)
+
+        # Generate the report with hierarchy
+        for task_id in selected_items:
+            add_task_to_report(task_id)
 
         report_text = "\n".join(report_lines)
         self.root.clipboard_clear()
         self.root.clipboard_append(report_text)
         messagebox.showinfo("Info", "Report copied to clipboard")
+
+    def get_task_hierarchy(self, task_ids):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        task_hierarchy = {task_id: [] for task_id in task_ids}
+        subtasks = []
+        for task_id in task_ids:
+            cursor.execute("SELECT id FROM task WHERE task_id = ?", (task_id,))
+            children = cursor.fetchall()
+            filtered_children = [child[0] for child in children if child[0] in task_ids]
+            if len(filtered_children) > 0:
+                subtasks.append(*filtered_children)
+            if task_id in subtasks:
+                del task_hierarchy[task_id]
+            else:
+                task_hierarchy[task_id].extend(filtered_children)
+
+        conn.close()
+        return task_hierarchy
+
 
 
     def update_field_dropdown(self, event):
