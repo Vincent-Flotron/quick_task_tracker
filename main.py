@@ -252,6 +252,13 @@ class TaskManagerApp:
         btn_frame.grid(column=0, row=row_offset)
         row_offset += 1
 
+        # Report button
+        report_btn_frame = tk.Frame(self.root)
+        report_btn_frame.grid(column=0, row=row_offset)
+        row_offset += 1
+        tk.Button(report_btn_frame, text="Generate Report", command=self.generate_report).grid(column=col_offset, row=0)
+        col_offset += 1
+
         tk.Button(btn_frame, text="Add Task", command=lambda: self.task_form()).grid(column=col_offset, row=0)
         col_offset += 1
         tk.Button(btn_frame, text="Add Subtask", command=lambda: self.task_form(subtask=True)).grid(column=col_offset, row=0)
@@ -260,6 +267,7 @@ class TaskManagerApp:
         col_offset += 1
         tk.Button(btn_frame, text="Delete Task", command=self.delete_task).grid(column=col_offset, row=0)
         col_offset = 0
+
 
         tk.Label(self.root, text="Deliveries").grid(column=0, row=row_offset)
         row_offset += 1
@@ -455,6 +463,55 @@ class TaskManagerApp:
         cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", (theme,))
         conn.commit()
         conn.close()
+
+    def generate_report(self):
+        selected_items = self.tree.selection()
+        if not selected_items:
+            messagebox.showwarning("Warning", "Please select a task to generate a report")
+            return
+
+        report_lines = []
+
+        for task_id in selected_items:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Get task details
+            cursor.execute("SELECT id, customer, name, description, started_at, finished_at FROM task WHERE id = ?", (task_id,))
+            task = cursor.fetchone()
+            if task:
+                report_lines.append(f"Task ID: {task[0]}")
+                report_lines.append(f"Customer: {task[1]}")
+                report_lines.append(f"Name: {task[2]}")
+                report_lines.append(f"Description: {task[3]}")
+                report_lines.append(f"Started At: {task[4]}")
+                report_lines.append(f"Finished At: {task[5]}")
+                report_lines.append("")
+
+                # Get related deliveries
+                cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
+                deliveries = cursor.fetchall()
+                if deliveries:
+                    report_lines.append("Related Deliveries:")
+                    for delivery in deliveries:
+                        report_lines.append(f"  Version: {delivery[0]}, Server: {delivery[1]}, Environment: {delivery[2]}, Delivery Date Time: {delivery[3]}")
+                    report_lines.append("")
+
+                # Get related origins
+                cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
+                origins = cursor.fetchall()
+                if origins:
+                    report_lines.append("Related Origins:")
+                    for origin in origins:
+                        report_lines.append(f"  Name: {origin[0]}, Type: {origin[1]}, Raw Link: {origin[2]}")
+                    report_lines.append("")
+
+            conn.close()
+
+        report_text = "\n".join(report_lines)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(report_text)
+        messagebox.showinfo("Info", "Report copied to clipboard")
 
 
     def update_field_dropdown(self, event):
