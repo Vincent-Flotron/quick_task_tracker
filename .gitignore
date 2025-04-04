@@ -5,3 +5,4 @@ MdToClipboard.py
 __pycache__/
 config.conf
 html.html
+config copy.conf

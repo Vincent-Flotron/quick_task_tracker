@@ -17,6 +17,7 @@ with open(config_file_path, "r") as f:
     db_path = f.readline().strip()
 
 
+
 # Custom DateEntry class to handle empty values and time
 class CustomDateEntry(ttk.Frame):
     def __init__(self, master=None, **kw):
@@ -81,124 +82,206 @@ class CustomTreeview(ttk.Treeview):
         self.grid(column=0, row=row_offset, sticky="we")
         self.scrollbar.grid(column=1, row=row_offset, sticky="ns")
 
-# Database setup
-def init_db():
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+class Database:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.init_db()
+        self.connexion = self.Connexion(db_path)
 
-    cursor.executescript('''
-    CREATE TABLE IF NOT EXISTS task (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customer TEXT,
-        name TEXT,
-        description TEXT,
-        started_at TEXT,
-        finished_at TEXT,
-        task_id INTEGER,
-        FOREIGN KEY(task_id) REFERENCES task(id)
-    );
+    # Database setup
+    def init_db(self):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-    CREATE TABLE IF NOT EXISTS delivery (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        version TEXT,
-        server TEXT,
-        environment TEXT,
-        delivery_date_time TEXT
-    );
+        cursor.executescript('''
+        CREATE TABLE IF NOT EXISTS task (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer TEXT,
+            name TEXT,
+            description TEXT,
+            started_at TEXT,
+            finished_at TEXT,
+            task_id INTEGER,
+            FOREIGN KEY(task_id) REFERENCES task(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS task_delivery (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        delivery_id INTEGER,
-        task_id INTEGER,
-        FOREIGN KEY(delivery_id) REFERENCES delivery(id),
-        FOREIGN KEY(task_id) REFERENCES task(id)
-    );
+        CREATE TABLE IF NOT EXISTS delivery (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            version TEXT,
+            server TEXT,
+            environment TEXT,
+            delivery_date_time TEXT
+        );
 
-    CREATE TABLE IF NOT EXISTS link (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT,
-        raw_link TEXT
-    );
+        CREATE TABLE IF NOT EXISTS task_delivery (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            delivery_id INTEGER,
+            task_id INTEGER,
+            FOREIGN KEY(delivery_id) REFERENCES delivery(id),
+            FOREIGN KEY(task_id) REFERENCES task(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS task_link (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER,
-        link_id INTEGER,
-        FOREIGN KEY(task_id) REFERENCES task(id),
-        FOREIGN KEY(link_id) REFERENCES link(id)
-    );
+        CREATE TABLE IF NOT EXISTS link (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT,
+            raw_link TEXT
+        );
 
-    CREATE TABLE IF NOT EXISTS tag (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT,
-        keywords TEXT
-    );
+        CREATE TABLE IF NOT EXISTS task_link (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            link_id INTEGER,
+            FOREIGN KEY(task_id) REFERENCES task(id),
+            FOREIGN KEY(link_id) REFERENCES link(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS tag_task (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER,
-        tag_id INTEGER,
-        FOREIGN KEY(task_id) REFERENCES task(id),
-        FOREIGN KEY(tag_id) REFERENCES tag(id)
-    );
+        CREATE TABLE IF NOT EXISTS tag (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT,
+            keywords TEXT
+        );
 
-    CREATE TABLE IF NOT EXISTS tag_link (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        link_id INTEGER,
-        tag_id INTEGER,
-        FOREIGN KEY(link_id) REFERENCES link(id),
-        FOREIGN KEY(tag_id) REFERENCES tag(id)
-    );
+        CREATE TABLE IF NOT EXISTS tag_task (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            tag_id INTEGER,
+            FOREIGN KEY(task_id) REFERENCES task(id),
+            FOREIGN KEY(tag_id) REFERENCES tag(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS origin (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        type TEXT,
-        raw_link TEXT
-    );
+        CREATE TABLE IF NOT EXISTS tag_link (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            link_id INTEGER,
+            tag_id INTEGER,
+            FOREIGN KEY(link_id) REFERENCES link(id),
+            FOREIGN KEY(tag_id) REFERENCES tag(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS task_origin (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER,
-        origin_id INTEGER,
-        FOREIGN KEY(task_id) REFERENCES task(id),
-        FOREIGN KEY(origin_id) REFERENCES origin(id)
-    );
+        CREATE TABLE IF NOT EXISTS origin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            type TEXT,
+            raw_link TEXT
+        );
 
-    CREATE TABLE IF NOT EXISTS booking (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT,
-        started_at TEXT,
-        ended_at TEXT,
-        duration TEXT,
-        task_id INTEGER,
-        origin_id INTEGER,
-        FOREIGN KEY(task_id) REFERENCES task(id),
-        FOREIGN KEY(origin_id) REFERENCES origin(id)
-    );
+        CREATE TABLE IF NOT EXISTS task_origin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            origin_id INTEGER,
+            FOREIGN KEY(task_id) REFERENCES task(id),
+            FOREIGN KEY(origin_id) REFERENCES origin(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS note (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER,
-        content TEXT,
-        FOREIGN KEY(task_id) REFERENCES task(id)
-    );
+        CREATE TABLE IF NOT EXISTS booking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            description TEXT,
+            started_at TEXT,
+            ended_at TEXT,
+            duration TEXT,
+            task_id INTEGER,
+            origin_id INTEGER,
+            FOREIGN KEY(task_id) REFERENCES task(id),
+            FOREIGN KEY(origin_id) REFERENCES origin(id)
+        );
 
-    CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE,
-        value TEXT
-    );
-    ''')
-    conn.commit()
-    conn.close()
+        CREATE TABLE IF NOT EXISTS note (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            content TEXT,
+            FOREIGN KEY(task_id) REFERENCES task(id)
+        );
 
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT UNIQUE,
+            value TEXT
+        );
+        ''')
+        conn.commit()
+        conn.close()
+
+    def execute_query(self, query, params=None):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            conn.commit()
+            return cursor
+
+    def fetch_all(self, query, params=None):
+        cursor = self.execute_query(query, params)
+        return cursor.fetchall()
+
+    def fetch_one(self, query, params=None):
+        cursor = self.execute_query(query, params)
+        return cursor.fetchone()
+
+    def save_theme(self, theme):
+        self.execute_query("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", (theme,))
+
+    def get_theme(self):
+        result = self.fetch_one("SELECT value FROM settings WHERE key = 'theme'")
+        return result[0] if result else None
+    
+    def connect(self):
+        self.conn = sqlite3.connect(self.db_path)
+
+    def disconnect(self):
+        self.conn.close()
+    
+    def fetch_one_connected(self, query, params=None):
+        cursor = self.execute_query(query, params)
+        return cursor.fetchone()
+
+    class Connexion:
+        def __init__(self, db_path):
+            self.db_path = db_path
+            self.conn = None
+            self._is_connected = False
+
+        def connect(self):
+            if self.is_connected():
+                raise RuntimeError("Trying to connect while already connected to {self.db_path}.")
+            self.conn = sqlite3.connect(self.db_path)
+            self._is_connected = True
+
+        def disconnect(self):
+            if not self.is_connected():
+                raise RuntimeError("Trying to disconnect while not connected to {self.db_path}.")
+            self.conn.close()
+            self._is_connected = False
+
+        def status(self):
+            return "connected" if self._is_connected else "disconnected"
+        
+        def is_connected(self):
+            return self._is_connected
+        
+        def fetch_all(self, query, params=None):
+            cursor = self._execute_query(query, params)
+            return cursor.fetchall()
+
+        def fetch_one(self, query, params=None):
+            cursor = self._execute_query(query, params)
+            return cursor.fetchone()
+        
+        def _execute_query(self, query, params=None):
+            cursor = self.conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            self.conn.commit()
+            return cursor
 
 # App class
 class TaskManagerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Task Manager")
+        self.db = Database(db_path)
         self.setup_ui()
         self.load_tasks()
         self.temp_file_path = None  # To store the path of the temporary file
@@ -209,11 +292,7 @@ class TaskManagerApp:
         self.load_theme()
 
     def load_theme(self):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'theme'")
-        result = cursor.fetchone()
-        conn.close()
+        result = self.db.fetch_one("SELECT value FROM settings WHERE key = 'theme'")
 
         if result:
             theme = result[0]
@@ -522,12 +601,11 @@ class TaskManagerApp:
                 return
             visited_tasks.add(task_id)
 
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+            self.db.connexion.connect()
 
             # Get task details
-            cursor.execute("SELECT id, customer, name, description, started_at, finished_at FROM task WHERE id = ?", (task_id,))
-            task = cursor.fetchone()
+            task = self.db.connexion.fetch_one("SELECT id, customer, name, description, started_at, finished_at FROM task WHERE id = ?", (task_id,))
+
             if task:
                 one = 1
                 indent = "    " * indent_level
@@ -541,8 +619,7 @@ class TaskManagerApp:
                     report_lines.append(f"{indent}{sub_indent}<li>Description: {task[3]}</li>")
 
                 # Get related deliveries
-                cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
-                deliveries = cursor.fetchall()
+                deliveries = self.db.connexion.fetch_all("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
                 if deliveries:
                     report_lines.append(f"{indent}{sub_indent}<li>Deliveries:</li><ul>")
 
@@ -559,20 +636,18 @@ class TaskManagerApp:
                             report_lines.append(f"{close_list_tag}{indent}{sub_indent}{sub_indent}<li>{version_and_server}:</li><ul>") # new version or server
                             close_list_tag = "</ul>"
                         delivery_date = delivery[3][:-3].replace("T", " ").replace("-", ".").replace(":", "h")
-                        report_lines.append(f"{indent}{sub_indent}{sub_indent}{sub_indent}<li>[x] '{delivery[2]}', {delivery_date}")
+                        report_lines.append(f"{indent}{sub_indent}{sub_indent}{sub_indent}<li>[x] {delivery[2]}, {delivery_date}")
                         last_version_and_server = version_and_server
 
                     report_lines.append("</ul></ul>")
 
                 # Get related origins
-                cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
-                origins = cursor.fetchall()
+                origins = self.db.connexion.fetch_all("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
                 if origins:
                     for origin in origins:
-                        # report_lines.append(f"{indent}{sub_indent}<li>[BCS: {origin[0]}]({origin[2]})</li>")
                         report_lines.append(f"{indent}{sub_indent}<li><a href=\"{origin[2]}\">BCS: {origin[0]}</a></li>")
                     
-            conn.close()
+            self.db.connexion.disconnect()
 
             # Recursively add child tasks
             if task_id in task_hierarchy:
@@ -584,21 +659,17 @@ class TaskManagerApp:
             add_task_to_report(task_id)
             report_lines.append("</ul>")
 
-        # report_text = "\n".join(report_lines)
         report_text = "\n".join(report_lines)
 
         MdToClipboard.html_to_clipboard_for_onenote(report_text)
         messagebox.showinfo("Info", "Report copied to clipboard")
 
     def get_task_hierarchy(self, task_ids):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
+        self.db.connexion.connect()
         task_hierarchy = {task_id: [] for task_id in task_ids}
         subtasks = []
         for task_id in task_ids:
-            cursor.execute("SELECT id FROM task WHERE task_id = ?", (task_id,))
-            children = cursor.fetchall()
+            children = self.db.connexion.fetch_all("SELECT id FROM task WHERE task_id = ?", (task_id,))
             filtered_children = [child[0] for child in children if child[0] in task_ids]
             if len(filtered_children) > 0:
                 for filtered_child in filtered_children:
@@ -608,7 +679,7 @@ class TaskManagerApp:
             else:
                 task_hierarchy[task_id].extend(filtered_children)
 
-        conn.close()
+        self.db.connexion.disconnect()
         return task_hierarchy
 
 
@@ -616,11 +687,7 @@ class TaskManagerApp:
     def update_field_dropdown(self, event):
         table = self.table_var.get()
         if table:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(f"PRAGMA table_info({table})")
-            fields = cursor.fetchall()
-            conn.close()
+            fields = self.db.fetch_all(f"PRAGMA table_info({table})")
             field_names = [field[1] for field in fields]
             self.field_dropdown['values'] = field_names
             if field_names:
@@ -632,8 +699,7 @@ class TaskManagerApp:
         cursor = conn.cursor()
 
         # Load parent tasks
-        cursor.execute("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id IS NULL")
-        parent_tasks = cursor.fetchall()
+        parent_tasks = self.db.fetch_all("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id IS NULL")
 
         self.tree.delete(*self.tree.get_children())
 
@@ -642,22 +708,15 @@ class TaskManagerApp:
             self.tree.insert("", "end", iid=task[0], values=("─────", task[1], task[2], task[3], task[4], task[5]), tags=("constant_width",))
             self.load_children_tasks(task[0], "")
 
-        conn.close()
 
     def load_children_tasks(self, parent_id, parent_iid):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
         # Load children tasks for the given parent_id
-        cursor.execute("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id = ?", (parent_id,))
-        children_tasks = cursor.fetchall()
+        children_tasks = self.db.fetch_all("SELECT id, customer, name, description, started_at, finished_at, task_id FROM task WHERE task_id = ?", (parent_id,))
 
         for task in children_tasks:
             indicator = "  └──"
             task_iid = self.tree.insert(parent_iid, "end", iid=task[0], values=(indicator, task[1], task[2], task[3], task[4], task[5]), tags=("constant_width",))
             self.load_children_tasks(task[0], task_iid)
-
-        conn.close()
 
 
     def on_task_select(self, event):
@@ -708,11 +767,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a task to edit")
             return
         task_id = selected_item[0]
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
-        task = cursor.fetchone()
-        conn.close()
+        task = self.db.fetch_one("SELECT * FROM task WHERE id = ?", (task_id,))
         if task:
             self.task_form(task)
 
@@ -804,33 +859,22 @@ class TaskManagerApp:
 
     def update_customer_combobox(self, event=None):
         customer_input = self.customer_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT customer FROM task WHERE customer LIKE ?", ('%' + customer_input + '%',))
-        customers = cursor.fetchall()
-        conn.close()
+        customers = self.db.fetch_all("SELECT DISTINCT customer FROM task WHERE customer LIKE ?", ('%' + customer_input + '%',))
 
         # Update the combobox values
         self.customer_combobox['values'] = [customer[0] for customer in customers]
 
     def update_name_combobox(self, event=None):
         name_input = self.name_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT name FROM task WHERE name LIKE ?", ('%' + name_input + '%',))
-        names = cursor.fetchall()
-        conn.close()
+        names = self.db.fetch_all("SELECT DISTINCT name FROM task WHERE name LIKE ?", ('%' + name_input + '%',))
 
         # Update the combobox values
         self.name_combobox['values'] = [name[0] for name in names]
 
     def update_desc_combobox(self, event=None):
         desc_input = self.desc_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT description FROM task WHERE description LIKE ?", ('%' + desc_input + '%',))
-        descriptions = cursor.fetchall()
-        conn.close()
+        descriptions = self.db.fetch_all("SELECT DISTINCT description FROM task WHERE description LIKE ?", ('%' + desc_input + '%',))
+
 
         # Update the combobox values
         self.desc_combobox['values'] = [desc[0] for desc in descriptions]
@@ -855,47 +899,46 @@ class TaskManagerApp:
         notes = set()
 
         for task_id in task_ids:
-            cursor.execute("""
+            delivery_rel = self.db.fetch_all("""
             SELECT d.id, d.version, d.server, d.environment, d.delivery_date_time
             FROM delivery d
             JOIN task_delivery td ON d.id = td.delivery_id
             WHERE td.task_id = ?""", (task_id,))
-            deliveries.update(cursor.fetchall())
+            deliveries.update(delivery_rel)
 
-            cursor.execute("""
+            link_rel = self.db.fetch_all("""
             SELECT l.id, l.type, l.raw_link
             FROM link l
             JOIN task_link tl ON l.id = tl.link_id
             WHERE tl.task_id = ?""", (task_id,))
-            links.update(cursor.fetchall())
+            links.update(link_rel)
 
-            cursor.execute("""
+            tag_rel = self.db.fetch_all("""
             SELECT t.id, t.type, t.keywords
             FROM tag t
             JOIN tag_task tt ON t.id = tt.tag_id
             WHERE tt.task_id = ?""", (task_id,))
-            tags.update(cursor.fetchall())
+            tags.update(tag_rel)
 
-            cursor.execute("""
+            origin_rel = self.db.fetch_all("""
             SELECT o.id, o.name, o.type, o.raw_link
             FROM origin o
             JOIN task_origin t_o ON o.id = t_o.origin_id
             WHERE t_o.task_id = ?""", (task_id,))
-            origins.update(cursor.fetchall())
+            origins.update(origin_rel)
 
-            cursor.execute("""
+            booking_rel = self.db.fetch_all("""
             SELECT b.id, b.description, b.started_at, b.ended_at, b.duration
             FROM booking b
             WHERE b.task_id = ?""", (task_id,))
-            bookings.update(cursor.fetchall())
-
-            cursor.execute("""
+            bookings.update(booking_rel)
+ 
+            note_rel = self.db.fetch_all("""
             SELECT n.id, n.content
             FROM note n
             WHERE n.task_id = ?""", (task_id,))
-            notes.update(cursor.fetchall())
+            notes.update(note_rel)
 
-        conn.close()
 
         self.delivery_tree.delete(*self.delivery_tree.get_children())
         for delivery in deliveries:
@@ -983,29 +1026,17 @@ class TaskManagerApp:
 
     def update_version_combobox(self, event=None):
         version_input = self.version_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT version FROM delivery WHERE version LIKE ?", ('%' + version_input + '%',))
-        versions = cursor.fetchall()
-        conn.close()
+        versions = self.db.fetch_all("SELECT DISTINCT version FROM delivery WHERE version LIKE ?", ('%' + version_input + '%',))
         self.version_combobox['values'] = [version[0] for version in versions]
 
     def update_server_combobox(self, event=None):
         server_input = self.server_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT server FROM delivery WHERE server LIKE ?", ('%' + server_input + '%',))
-        servers = cursor.fetchall()
-        conn.close()
+        servers = self.db.fetch_all("SELECT DISTINCT server FROM delivery WHERE server LIKE ?", ('%' + server_input + '%',))
         self.server_combobox['values'] = [server[0] for server in servers]
 
     def update_environment_combobox(self, event=None):
         environment_input = self.environment_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT environment FROM delivery WHERE environment LIKE ?", ('%' + environment_input + '%',))
-        environments = cursor.fetchall()
-        conn.close()
+        environments = self.db.fetch_all("SELECT DISTINCT environment FROM delivery WHERE environment LIKE ?", ('%' + environment_input + '%',))
         self.environment_combobox['values'] = [environment[0] for environment in environments]
 
 
@@ -1014,11 +1045,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a delivery to edit")
             return
         delivery_id = self.selected_related_id
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM delivery WHERE id = ?", (delivery_id,))
-        delivery = cursor.fetchone()
-        conn.close()
+        delivery = self.db.fetch_one("SELECT * FROM delivery WHERE id = ?", (delivery_id,))
         if delivery:
             form = tk.Toplevel(self.root)
             form.title("Edit Delivery")
@@ -1118,11 +1145,7 @@ class TaskManagerApp:
 
     def update_link_type_combobox(self, event=None):
         link_type_input = self.link_type_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT type FROM link WHERE type LIKE ?", ('%' + link_type_input + '%',))
-        link_types = cursor.fetchall()
-        conn.close()
+        link_types = self.db.fetch_all("SELECT DISTINCT type FROM link WHERE type LIKE ?", ('%' + link_type_input + '%',))
         self.link_type_combobox['values'] = [link_type[0] for link_type in link_types]
 
 
@@ -1131,11 +1154,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a link to edit")
             return
         link_id = self.selected_related_id
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM link WHERE id = ?", (link_id,))
-        link = cursor.fetchone()
-        conn.close()
+        link = self.db.fetch_one("SELECT * FROM link WHERE id = ?", (link_id,))
         if link:
             form = tk.Toplevel(self.root)
             form.title("Edit Link")
@@ -1220,20 +1239,12 @@ class TaskManagerApp:
 
     def update_tag_type_combobox(self, event=None):
         tag_type_input = self.tag_type_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT type FROM tag WHERE type LIKE ?", ('%' + tag_type_input + '%',))
-        tag_types = cursor.fetchall()
-        conn.close()
+        tag_types = self.db.fetch_all("SELECT DISTINCT type FROM tag WHERE type LIKE ?", ('%' + tag_type_input + '%',))
         self.tag_type_combobox['values'] = [tag_type[0] for tag_type in tag_types]
 
     def update_keywords_combobox(self, event=None):
         keywords_input = self.keywords_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT keywords FROM tag WHERE keywords LIKE ?", ('%' + keywords_input + '%',))
-        keywords = cursor.fetchall()
-        conn.close()
+        keywords = self.db.fetch_all("SELECT DISTINCT keywords FROM tag WHERE keywords LIKE ?", ('%' + keywords_input + '%',))
         self.keywords_combobox['values'] = [keyword[0] for keyword in keywords]
 
 
@@ -1242,11 +1253,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a tag to edit")
             return
         tag_id = self.selected_related_id
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tag WHERE id = ?", (tag_id,))
-        tag = cursor.fetchone()
-        conn.close()
+        tag = self.db.fetch_one("SELECT * FROM tag WHERE id = ?", (tag_id,))
         if tag:
             form = tk.Toplevel(self.root)
             form.title("Edit Tag")
@@ -1337,20 +1344,12 @@ class TaskManagerApp:
 
     def update_origin_name_combobox(self, event=None):
         origin_name_input = self.origin_name_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT name FROM origin WHERE name LIKE ?", ('%' + origin_name_input + '%',))
-        origin_names = cursor.fetchall()
-        conn.close()
+        origin_names = self.db.fetch_all("SELECT DISTINCT name FROM origin WHERE name LIKE ?", ('%' + origin_name_input + '%',))
         self.origin_name_combobox['values'] = [origin_name[0] for origin_name in origin_names]
 
     def update_origin_type_combobox(self, event=None):
         origin_type_input = self.origin_type_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT type FROM origin WHERE type LIKE ?", ('%' + origin_type_input + '%',))
-        origin_types = cursor.fetchall()
-        conn.close()
+        origin_types = self.db.fetch_all("SELECT DISTINCT type FROM origin WHERE type LIKE ?", ('%' + origin_type_input + '%',))
         self.origin_type_combobox['values'] = [origin_type[0] for origin_type in origin_types]
 
 
@@ -1359,11 +1358,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select an origin to edit")
             return
         origin_id = self.selected_related_id
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM origin WHERE id = ?", (origin_id,))
-        origin = cursor.fetchone()
-        conn.close()
+        origin = self.db.fetch_one("SELECT * FROM origin WHERE id = ?", (origin_id,))
         if origin:
             form = tk.Toplevel(self.root)
             form.title("Edit Origin")
@@ -1418,11 +1413,7 @@ class TaskManagerApp:
         selected_item = self.link_tree.selection()
         if selected_item:
             link_id = selected_item[0]
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT raw_link FROM link WHERE id = ?", (link_id,))
-            link = cursor.fetchone()
-            conn.close()
+            link = self.db.fetch_one("SELECT raw_link FROM link WHERE id = ?", (link_id,))
             if link:
                 webbrowser.open_new_tab(link[0])
 
@@ -1430,11 +1421,7 @@ class TaskManagerApp:
         selected_item = self.origin_tree.selection()
         if selected_item:
             origin_id = selected_item[0]
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT raw_link FROM origin WHERE id = ?", (origin_id,))
-            origin = cursor.fetchone()
-            conn.close()
+            origin = self.db.fetch_one("SELECT raw_link FROM origin WHERE id = ?", (origin_id,))
             if origin:
                 webbrowser.open_new_tab(origin[0])
 
@@ -1462,11 +1449,7 @@ class TaskManagerApp:
         duration_entry = tk.Entry(form)
         duration_entry.grid(row=3, column=1)
 
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM origin")
-        origins = cursor.fetchall()
-        conn.close()
+        origins = self.db.fetch_all("SELECT id, name FROM origin")
 
         tk.Label(form, text="Origin:").grid(row=4, column=0)
         origin_var = tk.StringVar()
@@ -1509,11 +1492,7 @@ class TaskManagerApp:
 
     def update_booking_desc_combobox(self, event=None):
         booking_desc_input = self.booking_desc_var.get()
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT description FROM booking WHERE description LIKE ?", ('%' + booking_desc_input + '%',))
-        booking_descs = cursor.fetchall()
-        conn.close()
+        booking_descs = self.db.fetch_all("SELECT DISTINCT description FROM booking WHERE description LIKE ?", ('%' + booking_desc_input + '%',))
         self.booking_desc_combobox['values'] = [booking_desc[0] for booking_desc in booking_descs]
 
 
@@ -1522,11 +1501,7 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please select a booking to edit")
             return
         booking_id = self.selected_related_id
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM booking WHERE id = ?", (booking_id,))
-        booking = cursor.fetchone()
-        conn.close()
+        booking = self.db.fetch_one("SELECT * FROM booking WHERE id = ?", (booking_id,))
         if booking:
             form = tk.Toplevel(self.root)
             form.title("Edit Booking")
@@ -1557,11 +1532,7 @@ class TaskManagerApp:
             duration_entry.grid(row=3, column=1)
             duration_entry.insert(0, booking[4])
 
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM origin")
-            origins = cursor.fetchall()
-            conn.close()
+            origins = self.db.fetch_all("SELECT id, name FROM origin")
 
             tk.Label(form, text="Origin:").grid(row=4, column=0)
             origin_var = tk.StringVar()
@@ -1636,11 +1607,7 @@ class TaskManagerApp:
         note = None
 
         if notes_id:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM note WHERE note.id = ?", (notes_id,))
-            note = cursor.fetchone()
-            conn.close()
+            note = self.db.fetch_one("SELECT * FROM note WHERE note.id = ?", (notes_id,))
 
         # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".md")
@@ -1715,18 +1682,13 @@ class TaskManagerApp:
             messagebox.showwarning("Warning", "Please enter all search criteria")
             return
 
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
         if operator == "LIKE":
             query = f"SELECT * FROM {table} WHERE {field} LIKE ?"
             value = '%' + value + '%'
         else:
             query = f"SELECT * FROM {table} WHERE {field} {operator} ?"
 
-        cursor.execute(query, (value,))
-        results = cursor.fetchall()
-        conn.close()
+        results = self.db.fetch_all(query, (value,))
 
         if results:
             search_result_window = tk.Toplevel(self.root)
@@ -1750,34 +1712,23 @@ class TaskManagerApp:
         item_values = result_tree.item(selected_item, "values")
         related_id = item_values[0]  # Assuming the first column is the ID of the searched table
 
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
         if table == "task":
             task_id = related_id
         elif table == "delivery":
-            cursor.execute("SELECT task_id FROM task_delivery WHERE delivery_id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM task_delivery WHERE delivery_id = ?", (related_id,))[0]
         elif table == "link":
-            cursor.execute("SELECT task_id FROM task_link WHERE link_id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM task_link WHERE link_id = ?", (related_id,))[0]
         elif table == "tag":
-            cursor.execute("SELECT task_id FROM tag_task WHERE tag_id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM tag_task WHERE tag_id = ?", (related_id,))[0]
         elif table == "origin":
-            cursor.execute("SELECT task_id FROM task_origin WHERE origin_id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM task_origin WHERE origin_id = ?", (related_id,))[0]
         elif table == "booking":
-            cursor.execute("SELECT task_id FROM booking WHERE id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM booking WHERE id = ?", (related_id,))[0]
         elif table == "note":
-            cursor.execute("SELECT task_id FROM note WHERE id = ?", (related_id,))
-            task_id = cursor.fetchone()[0]
+            task_id = self.db.fetch_one("SELECT task_id FROM note WHERE id = ?", (related_id,))[0]
         else:
             messagebox.showwarning("Warning", "Unsupported table for search results")
             return
-
-        conn.close()
 
         # Select the related task in the main tree
         self.tree.selection_set(task_id)
@@ -1791,7 +1742,6 @@ class TaskManagerApp:
 
 
 if __name__ == "__main__":
-    init_db()
     root = tk.Tk()
     app = TaskManagerApp(root)
     root.mainloop()
