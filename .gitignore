@@ -1,3 +1,5 @@
 tasks.db
 tasks_test.db
 tasks_old.db
+MdToClipboard.py
+__pycache__/
