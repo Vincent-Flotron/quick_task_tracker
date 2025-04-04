@@ -92,13 +92,13 @@ class md_to_clipboard:
 if __name__ == "__main__":
 
     markdown_text = """
-    - (Dev) Soply
-        - TaskN°bla
-            - booking : [https://bla.ch](https://bla.ch)
-            - delivered
-                - [] Testy
-                - [x] Testc
-    """
+- (Dev) Soply
+    - TaskN°bla
+        - booking : [https://bla.ch](https://bla.ch)
+        - delivered
+            - [] Testy
+            - [x] Testc
+"""
 
 if md_to_clipboard.md_to_clipboard_for_onenote(markdown_text):
     print("RTF, plain text, and HTML content copied to clipboard!")
