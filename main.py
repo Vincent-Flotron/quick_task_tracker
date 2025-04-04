@@ -35,7 +35,7 @@ class CustomDateEntry(ttk.Frame):
         if date_str and hour and minute:
             try:
                 date_ret = datetime.strptime(f"{date_str} {hour}:{minute}", "%Y-%m-%d %H:%M")
-                return date_ret.isoformat()
+                return date_ret.isoformat().replace(' ', 'T')
             except ValueError:
                 messagebox.showwarning("Warning", f"Invalid date or time format '%Y-%m-%d %H:%M': {date_str} {hour}:{minute}")
                 return None
@@ -477,6 +477,25 @@ class TaskManagerApp:
         report_lines = []
         visited_tasks = set()
 
+        def move_matching_row_to_end(array, col_nb = 2, pattern = "PROD"):
+            # Find rows where the second column is "PROD"
+            prod_rows = [row for row in array if row[col_nb] == pattern]
+            
+            # Remove these rows from the original array
+            filtered_array = [row for row in array if row[col_nb] != pattern]
+            
+            # Append the "PROD" rows to the end
+            result = filtered_array + prod_rows
+            
+            return result
+        
+        def sort_array_by_col_nb(list_of_lists, col_nb, direction="asc"):
+            reverse = False if direction.lower() == "asc" else True
+            # Sort the list in descending order by the second column
+            sorted_list = sorted(list_of_lists, key=lambda x: x[col_nb], reverse=True)
+            return sorted_list
+
+
         def add_task_to_report(task_id, indent_level=0):
             if task_id in visited_tasks:
                 return
@@ -490,30 +509,31 @@ class TaskManagerApp:
             task = cursor.fetchone()
             if task:
                 indent = "    " * indent_level
-                report_lines.append(f"{indent}Task ID: {task[0]}")
-                report_lines.append(f"{indent}Customer: {task[1]}")
-                report_lines.append(f"{indent}Name: {task[2]}")
-                report_lines.append(f"{indent}Description: {task[3]}")
-                report_lines.append(f"{indent}Started At: {task[4]}")
-                report_lines.append(f"{indent}Finished At: {task[5]}")
+                report_lines.append(f"{indent}{task[1]}:")
+                report_lines.append(f"{indent}  {task[2]}: {task[3]}")
                 report_lines.append("")
 
                 # Get related deliveries
                 cursor.execute("SELECT d.version, d.server, d.environment, d.delivery_date_time FROM delivery d JOIN task_delivery td ON d.id = td.delivery_id WHERE td.task_id = ?", (task_id,))
                 deliveries = cursor.fetchall()
                 if deliveries:
-                    report_lines.append(f"{indent}Related Deliveries:")
+                    report_lines.append(f"{indent}Deliveries:")
+
+                    # Order deliveries
+                    deliveries = sort_array_by_col_nb(deliveries, 2)
+                    deliveries = move_matching_row_to_end(deliveries, 2, "PROD")
+
                     for delivery in deliveries:
-                        report_lines.append(f"{indent}  Version: {delivery[0]}, Server: {delivery[1]}, Environment: {delivery[2]}, Delivery Date Time: {delivery[3]}")
+                        report_lines.append(f"{indent}  V {delivery[0]}, {delivery[1]}, {delivery[2]}, {delivery[3]}")
                     report_lines.append("")
 
                 # Get related origins
                 cursor.execute("SELECT o.name, o.type, o.raw_link FROM origin o JOIN task_origin t_o ON o.id = t_o.origin_id WHERE t_o.task_id = ?", (task_id,))
                 origins = cursor.fetchall()
                 if origins:
-                    report_lines.append(f"{indent}Related Origins:")
+                    report_lines.append(f"{indent}  Link for booking:")
                     for origin in origins:
-                        report_lines.append(f"{indent}  Name: {origin[0]}, Type: {origin[1]}, Raw Link: {origin[2]}")
+                        report_lines.append(f"{indent}    {origin[0]}: {origin[2]}")
                     report_lines.append("")
 
             conn.close()
