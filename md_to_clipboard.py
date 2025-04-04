@@ -1,6 +1,6 @@
 import win32clipboard
 import html2text
-
+import markdown
 
 def copy_to_clipboard(rtf_content, plain_text_content, html_content):
     # Open the clipboard
@@ -99,30 +99,17 @@ def html_to_rtf(html_body):
     return rtf_content
 
 
-
-# HTML content to copy
-html_body = """<html>
-<body>
-<ul>
-    <li>(Dev) Soply
-    <ul>
-        <li>TaskN°bla
-        <ul>
-            <li>booking: <a href="https://bla.ch">https://bla.ch</a></li>
-            <li>
-            <ul>delivered
-                <li>&#x2610; Testy</li>
-                <li>&#x2612; Testc</li>
-            </ul>
-            </li>
-        </ul>
-        </li>
-    </ul>
-    </li>
-</ul>
-</body>
-</html>
+markdown_text = """
+- (Dev) Soply
+    - TaskN°bla
+        - booking : [https://bla.ch](https://bla.ch)
+        - delivered
+            - [] Testy
+            - [x] Testc
 """
+
+# Convert Markdown to HTML
+html_body = f"<html><body>{markdown.markdown(markdown_text)}</body></html>"
 
 html_text = create_html_with_fragment(html_body)
 
